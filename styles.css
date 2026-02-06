@@ -1,0 +1,152 @@
+:root {
+  color-scheme: dark;
+  --bg: #17191f;
+  --panel: #232834;
+  --text: #f2f4ff;
+  --muted: #b0b8d3;
+  --border: #3b4460;
+  --physical: #9ea7c8;
+  --fire: #ff6a3d;
+  --ice: #59d4ff;
+  --lightning: #d39bff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: linear-gradient(180deg, #131721, #10131b);
+  color: var(--text);
+  font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+}
+
+.layout {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  gap: 1rem;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  min-height: 0;
+}
+
+h1,
+h2 {
+  margin-top: 0;
+}
+
+.stats p,
+.status-area p {
+  margin: 0.35rem 0;
+}
+
+.enemy-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.enemy-card {
+  border: 1px solid var(--border);
+  border-left-width: 6px;
+  border-radius: 8px;
+  padding: 0.75rem;
+  background: #1c2130;
+  cursor: pointer;
+}
+
+.enemy-card.selected {
+  outline: 2px solid #ffffffcc;
+}
+
+.enemy-card.physical {
+  border-left-color: var(--physical);
+}
+.enemy-card.fire {
+  border-left-color: var(--fire);
+}
+.enemy-card.ice {
+  border-left-color: var(--ice);
+}
+.enemy-card.lightning {
+  border-left-color: var(--lightning);
+}
+
+.enemy-card p {
+  margin: 0.25rem 0;
+}
+
+.controls {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.skill-row {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+button,
+select {
+  font: inherit;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: #2f3850;
+  color: var(--text);
+  padding: 0.5rem 0.65rem;
+}
+
+button:hover {
+  filter: brightness(1.1);
+}
+
+.skill-description {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  min-height: 2.8em;
+}
+
+.log {
+  max-height: 70vh;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.95rem;
+}
+
+.log p {
+  margin: 0;
+  border-bottom: 1px dashed #3a4054;
+  padding-bottom: 0.2rem;
+}
+
+@media (max-width: 980px) {
+  .layout {
+    grid-template-columns: repeat(3, minmax(280px, 1fr));
+    overflow-x: auto;
+    align-items: stretch;
+  }
+
+  .player-panel,
+  .enemy-panel,
+  .log-panel {
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+  }
+
+  .log {
+    max-height: none;
+  }
+}
