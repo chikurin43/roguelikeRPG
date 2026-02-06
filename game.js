@@ -67,6 +67,59 @@ const PLAYER_SKILLS = [
   { id: "doom-design", name: "終焉設計", kind: "active", mpCost: 30 },
 ];
 
+const SKILL_DESCRIPTIONS = {
+  "laceration": "物理ダメージを与え、出血を付与する。",
+  "pursuit-stance": "出血中の敵への与ダメージが増加する。",
+  "bone-break": "防御無視攻撃。凍結中の敵にはさらに高威力。",
+  "counter-stance": "次に被弾した際、確率で反撃する。",
+  "vital-read": "感電中の敵へ高確率でクリティカル補正。",
+  "bleed-spread": "出血ダメージがターン経過で徐々に増加する。",
+  "piercing-thrust": "敵DEFの影響を半減して攻撃。",
+  "blood-feast": "敵撃破時にHP回復。出血中の敵なら回復増加。",
+  "fire-bolt": "炎ダメージと炎上付与。",
+  "inferno-follow": "炎上中の敵全体へ追撃。",
+  "fuel-drop": "炎上ダメージをその場で即時発動。",
+  "wildfire": "炎上を他の敵へ伝播。",
+  "ashenize": "炎上中の敵のDEFを低下。",
+  "self-ignite": "ATK上昇と引き換えに自身へ微炎上。",
+  "searing-focus": "凍結中の敵に大ダメージを与え凍結を解除。",
+  "ice-lance": "氷ダメージと凍結付与。",
+  "frost-bind": "凍結中の敵のATKを低下。",
+  "cooling-barrier": "次の被ダメージを軽減する障壁を展開。",
+  "absolute-zero": "低HPの敵ほど高確率で凍結。",
+  "ice-crush": "凍結中の敵に高威力の氷攻撃。",
+  "calm-mind": "MP自然回復量が+5される。",
+  "cold-resist": "凍結を無効化する。",
+  "thunder": "雷ダメージと感電付与。",
+  "overcurrent": "感電中の敵へのダメージが増加。",
+  "chain-lightning": "感電中の敵へ連鎖攻撃。",
+  "neural-disrupt": "感電付与+敵行動率低下。",
+  "charged-weapon": "通常攻撃に雷属性を付与。",
+  "discharge": "感電を消費し範囲雷ダメージ。",
+  "thunder-resonance": "感電敵が多いほど与ダメージ上昇。",
+  "status-compress": "敵の状態異常ターンを延長。",
+  "status-amp": "次回付与する状態異常効果を2倍。",
+  "status-convert": "炎上と出血を相互変換。",
+  "corrosion": "敵の状態異常数に応じてDEF低下。",
+  "resist-break": "敵の耐性効果を一時無効化。",
+  "infection-burst": "状態異常中の敵を倒すと周囲へ拡散。",
+  "focus": "攻撃せずMPを20回復。",
+  "mana-siphon": "状態異常中の敵攻撃時にMP回復。",
+  "overcast": "次スキルの威力とMP消費が2倍。",
+  "mana-save": "確率でMP消費を0にする。",
+  "mana-reflux": "MP不足時にHPを支払ってスキルを使用。",
+  "iron-wall": "次に受けるダメージを大幅軽減。",
+  "fire-ice-guard": "炎・氷属性ダメージを軽減。",
+  "lightning-evasion": "感電中に被弾した際、確率で回避。",
+  "hemostasis": "出血解除+HP回復。",
+  "self-repair": "MP非消費ターンにHP自動回復。",
+  "element-invert": "敵属性を別属性に変更。",
+  "resonance-break": "敵の固有スキルを1ターン封印。",
+  "time-bomb": "数ターン後に状態異常を一斉起爆。",
+  "adaptive-evo": "受けた属性ダメージへの耐性を獲得。",
+  "doom-design": "状態異常3種以上の敵へ即死級ダメージ。"
+};
+
 const ENEMY_SKILLS = [
   { id: "enemy-slash", name: "乱撃", effect: (g, e) => g.hitPlayer(g.calculateDamage(e.atk * 1.3, g.player.def, g.player, "enemy"), e, "敵スキル:乱撃") },
   { id: "enemy-ember", name: "焦熱", effect: (g, e) => { g.hitPlayer(g.calculateDamage(e.atk * 1.2 + 5, g.player.def, g.player, "enemy"), e, "敵スキル:焦熱"); g.applyStatus(g.player, "burn", 3, 8, false); } },
@@ -94,6 +147,7 @@ class Game {
     this.enemyListEl = document.getElementById("enemyList");
     this.logEl = document.getElementById("log");
     this.skillSelect = document.getElementById("skillSelect");
+    this.skillDescriptionEl = document.getElementById("skillDescription");
     this.statusArea = document.getElementById("statusArea");
     this.basicAttackBtn = document.getElementById("basicAttackBtn");
     this.useSkillBtn = document.getElementById("useSkillBtn");
@@ -111,6 +165,7 @@ class Game {
   wireEvents() {
     this.basicAttackBtn.addEventListener("click", () => this.playerAction("basic"));
     this.useSkillBtn.addEventListener("click", () => this.playerAction("skill"));
+    this.skillSelect.addEventListener("change", () => this.updateSkillDescription());
   }
 
   bootstrapEnemies() {
@@ -454,20 +509,20 @@ class Game {
   }
 
   applyReward(enemy) {
-    const scale = 1 + (enemy.level * (enemy.level - 1)) / 6;
+    const level = enemy.level;
     if (enemy.rewardStat === "hp") {
-      const gain = Math.round(10 * scale);
+      const gain = 10 * level;
       this.player.maxHp += gain;
       this.player.hp += gain;
       this.log(`報酬: 最大HP +${gain}`);
     }
     if (enemy.rewardStat === "atk") {
-      const gain = Math.round(scale);
+      const gain = level;
       this.player.atk += gain;
       this.log(`報酬: ATK +${gain}`);
     }
     if (enemy.rewardStat === "def") {
-      const gain = Math.round(0.5 * scale * 10) / 10;
+      const gain = Math.round(0.5 * level * 10) / 10;
       this.player.def = Math.round((this.player.def + gain) * 10) / 10;
       this.log(`報酬: DEF +${gain}`);
     }
@@ -501,6 +556,25 @@ class Game {
     this.useSkillBtn.disabled = true;
   }
 
+  updateSkillDescription() {
+    if (!this.skillDescriptionEl) return;
+    const id = this.skillSelect.value;
+    if (!id) {
+      this.skillDescriptionEl.textContent = "スキル未選択";
+      return;
+    }
+
+    const skill = PLAYER_SKILLS.find((s) => s.id === id);
+    if (!skill) {
+      this.skillDescriptionEl.textContent = "説明なし";
+      return;
+    }
+
+    const typeText = skill.kind === "active" ? "アクティブ" : "パッシブ";
+    const costText = skill.kind === "active" ? ` / MP:${skill.mpCost}` : "";
+    this.skillDescriptionEl.textContent = `${skill.name} [${typeText}${costText}] - ${SKILL_DESCRIPTIONS[id] || "説明なし"}`;
+  }
+
   render() {
     this.playerStatsEl.innerHTML = `<p>ターン: ${this.turn}</p><p>撃破数: ${this.player.kills}</p><p>HP: ${this.player.hp} / ${this.player.maxHp}</p><p>MP: ${this.player.mp} / ${this.player.maxMp}</p><p>ATK: ${this.player.atk}</p><p>DEF: ${this.player.def}</p><p>取得スキル: ${this.player.skills.length}/50</p>`;
     const st = this.player.statuses.map((s) => `${STATUS_NAMES[s.type]}(${s.duration})`).join(" / ");
@@ -531,6 +605,7 @@ class Game {
       opt.textContent = `${skill.name} (MP:${skill.mpCost})`;
       this.skillSelect.appendChild(opt);
     });
+    this.updateSkillDescription();
   }
 
   log(message) {
