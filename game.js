@@ -509,20 +509,20 @@ class Game {
   }
 
   applyReward(enemy) {
-    const level = enemy.level;
+    const scale = 1 + (enemy.level * (enemy.level - 1)) / 6;
     if (enemy.rewardStat === "hp") {
-      const gain = 10 * level;
+      const gain = Math.round(10 * scale);
       this.player.maxHp += gain;
       this.player.hp += gain;
       this.log(`報酬: 最大HP +${gain}`);
     }
     if (enemy.rewardStat === "atk") {
-      const gain = level;
+      const gain = Math.round(scale);
       this.player.atk += gain;
       this.log(`報酬: ATK +${gain}`);
     }
     if (enemy.rewardStat === "def") {
-      const gain = Math.round(0.5 * level * 10) / 10;
+      const gain = Math.round(0.5 * scale * 10) / 10;
       this.player.def = Math.round((this.player.def + gain) * 10) / 10;
       this.log(`報酬: DEF +${gain}`);
     }
