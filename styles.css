@@ -1,0 +1,214 @@
+:root {
+  color-scheme: dark;
+  --bg: #17191f;
+  --panel: #232834;
+  --text: #f2f4ff;
+  --muted: #b0b8d3;
+  --border: #3b4460;
+  --physical: #9ea7c8;
+  --fire: #ff6a3d;
+  --ice: #59d4ff;
+  --lightning: #d39bff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: linear-gradient(180deg, #131721, #10131b);
+  color: var(--text);
+  font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+}
+
+.layout {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0.75rem;
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 0.75rem;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem;
+  min-height: 0;
+}
+
+h1,
+h2 {
+  margin-top: 0;
+}
+
+.stats p,
+.status-area p {
+  margin: 0.25rem 0;
+}
+
+.passive-list {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #1b2030;
+  font-size: 0.85rem;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.passive-list h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.9rem;
+}
+
+.passive-list ul {
+  margin: 0;
+  padding-left: 1rem;
+}
+
+.passive-list li {
+  margin-bottom: 0.25rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 1rem;
+}
+
+.enemy-list {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.enemy-card {
+  border: 1px solid var(--border);
+  border-left-width: 6px;
+  border-radius: 8px;
+  padding: 0.75rem;
+  background: #1c2130;
+  cursor: pointer;
+}
+
+.enemy-card.selected {
+  outline: 2px solid #ffffffcc;
+}
+
+.enemy-card.physical {
+  border-left-color: var(--physical);
+}
+.enemy-card.fire {
+  border-left-color: var(--fire);
+}
+.enemy-card.ice {
+  border-left-color: var(--ice);
+}
+.enemy-card.lightning {
+  border-left-color: var(--lightning);
+}
+
+.enemy-card p {
+  margin: 0.25rem 0;
+}
+
+.enemy-skill-desc {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.controls {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.skill-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+button,
+select {
+  font: inherit;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: #2f3850;
+  color: var(--text);
+  padding: 0.5rem 0.65rem;
+}
+
+button:hover {
+  filter: brightness(1.1);
+}
+
+.skill-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.skill-buttons {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.skill-button {
+  border: 1px solid var(--border);
+  background: #2b3348;
+  color: var(--text);
+  padding: 0.65rem 0.6rem;
+  border-radius: 8px;
+  text-align: left;
+  min-height: 86px;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.skill-button span {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.log {
+  max-height: 40vh;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.log p {
+  margin: 0;
+  border-bottom: 1px dashed #3a4054;
+  padding-bottom: 0.2rem;
+}
+
+@media (max-width: 980px) {
+  .layout {
+    padding: 0.5rem;
+    gap: 0.5rem;
+    grid-template-columns: 1fr;
+  }
+
+  .panel {
+    padding: 0.65rem;
+  }
+
+  .enemy-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .skill-buttons {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .log {
+    max-height: 35vh;
+  }
+}

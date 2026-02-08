@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Roguelike Battle Prototype</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <section class="panel player-panel">
+        <h1>ローグライクRPG バトル試作</h1>
+        <div id="playerStats" class="stats"></div>
+        <div id="statusArea" class="status-area"></div>
+        <div id="passiveSkills" class="passive-list"></div>
+        <div class="controls">
+          <h2>プレイヤー行動</h2>
+          <p>敵を選んで「通常攻撃」またはスキルを使用してください。</p>
+          <div class="skill-row">
+            <button id="basicAttackBtn" type="button">通常攻撃</button>
+            <p class="skill-hint">アクティブスキルは下のボタンから使用</p>
+          </div>
+          <div id="activeSkillButtons" class="skill-buttons"></div>
+        </div>
+      </section>
+
+      <section class="panel enemy-panel">
+        <h2>敵一覧 (最大5体)</h2>
+        <div id="enemyList" class="enemy-list"></div>
+      </section>
+
+      <section class="panel log-panel">
+        <h2>ログ</h2>
+        <div id="log" class="log"></div>
+      </section>
+    </main>
+
+    <script type="module" src="game.js"></script>
+  </body>
+</html>
