@@ -120,11 +120,78 @@ const SKILL_DESCRIPTIONS = {
   "doom-design": "状態異常3種以上の敵へ即死級ダメージ。"
 };
 
+const enemyAttack = (game, enemy, mult, element, label, bonus = 0) => {
+  const damage = game.calculateDamage(enemy.atk * mult + bonus, game.player.def, game.player, "enemy", element, enemy);
+  game.hitPlayer(damage, enemy, label);
+  return damage;
+};
+
+const enemyApplyDebuff = (game, type, duration, value, label) => {
+  game.applyDebuff(type, duration, value);
+  if (label) game.log(label);
+};
+
 const ENEMY_SKILLS = [
-  { id: "enemy-slash", name: "乱撃", effect: (g, e) => g.hitPlayer(g.calculateDamage(e.atk * 1.3, g.player.def, g.player, "enemy"), e, "敵スキル:乱撃") },
-  { id: "enemy-ember", name: "焦熱", effect: (g, e) => { g.hitPlayer(g.calculateDamage(e.atk * 1.2 + 5, g.player.def, g.player, "enemy"), e, "敵スキル:焦熱"); g.applyStatus(g.player, "burn", 3, 8, false); } },
-  { id: "enemy-frost", name: "凍気", effect: (g, e) => { g.hitPlayer(g.calculateDamage(e.atk * 1.1, g.player.def, g.player, "enemy"), e, "敵スキル:凍気"); g.applyStatus(g.player, "freeze", 2, 0.15, false); } },
-  { id: "enemy-shock", name: "雷撃", effect: (g, e) => { g.hitPlayer(g.calculateDamage(e.atk * 1.15, g.player.def, g.player, "enemy"), e, "敵スキル:雷撃"); g.applyStatus(g.player, "shock", 2, 0.15, false); } },
+  { id: "claw-rip", name: "裂爪", description: "物理ダメージ＋出血", effect: (g, e) => { enemyAttack(g, e, 1.1, "physical", "敵スキル:裂爪"); g.applyStatus(g.player, "bleed", 3, 0.03, false); } },
+  { id: "blood-curse", name: "血の呪い", description: "出血中のプレイヤーの回復量低下", effect: (g) => { if (g.hasStatus(g.player, "bleed")) enemyApplyDebuff(g, "healMultiplier", 3, 0.6, "血の呪い: 回復量低下"); } },
+  { id: "combo-instinct", name: "連撃本能", description: "出血中の相手に連続攻撃", effect: (g, e) => { const hits = g.hasStatus(g.player, "bleed") ? 2 : 1; for (let i = 0; i < hits; i += 1) enemyAttack(g, e, 0.9, "physical", "敵スキル:連撃本能"); } },
+  { id: "flesh-sunder", name: "肉削ぎ", description: "最大HP割合ダメ", effect: (g, e) => { const damage = Math.max(5, Math.round(g.player.maxHp * 0.08)); g.player.hp = Math.max(0, g.player.hp - damage); g.log(`${e.id}の肉削ぎ: ${damage}ダメージ`); } },
+  { id: "predation", name: "捕食", description: "出血中の相手を攻撃するとHP回復", effect: (g, e) => { const damage = enemyAttack(g, e, 1.0, "physical", "敵スキル:捕食"); if (g.hasStatus(g.player, "bleed")) { const heal = Math.round(damage * 0.5); e.hp = Math.min(e.maxHp, e.hp + heal); g.log(`${e.id}は捕食でHP+${heal}`); } } },
+  { id: "vital-pierce", name: "急所穿ち", description: "感電中の相手に被ダメ増加", effect: (g) => { if (g.hasStatus(g.player, "shock")) enemyApplyDebuff(g, "damageTaken", 2, 1.2, "急所穿ち: 被ダメ増加"); } },
+  { id: "armor-break", name: "破甲打", description: "DEFを一時的に低下", effect: (g) => enemyApplyDebuff(g, "defDown", 3, 1.5, "破甲打: DEF低下") },
+  { id: "execution-instinct", name: "処刑衝動", description: "HPが低い相手への与ダメ上昇", effect: (g, e) => { const mult = g.player.hp / g.player.maxHp < 0.4 ? 1.6 : 1.0; enemyAttack(g, e, mult, "physical", "敵スキル:処刑衝動"); } },
+  { id: "fireball", name: "火炎弾", description: "炎ダメージ＋炎上", effect: (g, e) => { enemyAttack(g, e, 1.05, "fire", "敵スキル:火炎弾"); g.applyStatus(g.player, "burn", 3, 8, false); } },
+  { id: "spreading-fury", name: "燃え広がる怒り", description: "炎上数に応じてATK上昇", effect: (g, e) => { e.temp.spreadingFury = 3; g.log(`${e.id}は燃え広がる怒りを纏った`); } },
+  { id: "incinerate", name: "焼却", description: "炎上中の相手のDEF低下", effect: (g) => { if (g.hasStatus(g.player, "burn")) enemyApplyDebuff(g, "defDown", 2, 1.0, "焼却: DEF低下"); } },
+  { id: "self-destruct-core", name: "自爆炉心", description: "死亡時に炎ダメ＋炎上", effect: (g, e) => g.log(`${e.id}の炉心が不穏に輝く…`) },
+  { id: "overheat", name: "過熱", description: "炎上中に行動回数増加", effect: (g, e) => { if (g.hasStatus(e, "burn")) { e.temp.extraAction = 1; g.log(`${e.id}は過熱で加速した`); } } },
+  { id: "ash-barrier", name: "灰の障壁", description: "炎上中、被ダメ軽減", effect: (g, e) => { e.temp.ashBarrier = 3; g.log(`${e.id}は灰の障壁を展開`); } },
+  { id: "burn-transfer", name: "燃焼転移", description: "受けた炎上をプレイヤーに移す", effect: (g, e) => { if (g.hasStatus(e, "burn")) { g.removeStatus(e, "burn"); g.applyStatus(g.player, "burn", 3, 8, false); g.log("燃焼転移が発動"); } } },
+  { id: "ice-fang", name: "氷牙", description: "氷ダメージ＋凍結", effect: (g, e) => { enemyAttack(g, e, 1.05, "ice", "敵スキル:氷牙"); g.applyStatus(g.player, "freeze", 2, 0.2, false); } },
+  { id: "chill-gaze", name: "冷却視線", description: "プレイヤーの与ダメ低下", effect: (g) => enemyApplyDebuff(g, "damageDealt", 3, 0.8, "冷却視線: 与ダメ低下") },
+  { id: "frost-cage", name: "霜の檻", description: "凍結中の相手はMP回復不可", effect: (g) => { if (g.hasStatus(g.player, "freeze")) enemyApplyDebuff(g, "mpRegenBlock", 2, 1, "霜の檻: MP回復不可"); } },
+  { id: "ice-armor", name: "氷結装甲", description: "凍結中、DEF大幅上昇", effect: (g, e) => g.log(`${e.id}は氷結装甲を纏う`) },
+  { id: "frostbite", name: "凍傷", description: "凍結解除時に追加ダメ", effect: (g, e) => g.log(`${e.id}の凍傷が忍び寄る`) },
+  { id: "subzero-thought", name: "氷点下思考", description: "プレイヤーのスキル発動率低下", effect: (g) => enemyApplyDebuff(g, "skillFail", 3, 0.2, "氷点下思考: 発動率低下") },
+  { id: "cold-domination", name: "冷気支配", description: "炎上効果減少", effect: (g, e) => g.log(`${e.id}の冷気が戦場を支配`) },
+  { id: "discharge-strike", name: "放電打撃", description: "雷ダメージ＋感電", effect: (g, e) => { enemyAttack(g, e, 1.05, "lightning", "敵スキル:放電打撃"); g.applyStatus(g.player, "shock", 3, 0.15, false); } },
+  { id: "overvoltage", name: "過電圧", description: "感電中の相手の被ダメ増加", effect: (g) => { if (g.hasStatus(g.player, "shock")) enemyApplyDebuff(g, "damageTaken", 2, 1.2, "過電圧: 被ダメ増加"); } },
+  { id: "nerve-block", name: "神経遮断", description: "感電中、スキルが失敗する確率", effect: (g) => { if (g.hasStatus(g.player, "shock")) enemyApplyDebuff(g, "skillFail", 2, 0.3, "神経遮断: スキル失敗率上昇"); } },
+  { id: "electromagnetic-accel", name: "電磁加速", description: "感電中の敵がいるほど行動速度UP", effect: (g, e) => { e.temp.electroAccel = 2; g.log(`${e.id}は電磁加速を開始`); } },
+  { id: "shock-chain", name: "感電連鎖", description: "感電を他者へ伝播", effect: (g) => { if (g.hasStatus(g.player, "shock")) { const target = g.enemies.find((en) => !g.hasStatus(en, "shock")); if (target) g.applyStatus(target, "shock", 2, 0.1, false); } else { g.applyStatus(g.player, "shock", 2, 0.1, false); } } },
+  { id: "thunder-reflect", name: "雷鳴反射", description: "雷ダメージを受けると反射", effect: (g, e) => g.log(`${e.id}は雷鳴反射を帯びている`) },
+  { id: "potential-reversal", name: "電位逆転", description: "プレイヤーのバフを感電に変換", effect: (g) => { g.player.temp.overcast = false; g.player.temp.ironWall = false; g.player.temp.barrier = 0; g.applyStatus(g.player, "shock", 2, 0.15, false); g.log("電位逆転でバフが崩れた"); } },
+  { id: "abnormal-resistance", name: "異常耐性", description: "付与された状態異常の効果半減", effect: (g, e) => g.log(`${e.id}は異常耐性を持つ`) },
+  { id: "abnormal-proliferation", name: "異常増殖", description: "状態異常が増えるごとにATK上昇", effect: (g, e) => g.log(`${e.id}の異常増殖が進行`) },
+  { id: "abnormal-reversal", name: "異常反転", description: "受けた状態異常をプレイヤーへ返す", effect: (g, e) => g.log(`${e.id}は異常反転を構える`) },
+  { id: "corrosive-erosion", name: "腐食侵食", description: "状態異常中の相手のDEFを毎ターン削る", effect: (g, e) => g.log(`${e.id}の腐食侵食が発動中`) },
+  { id: "abnormal-implode", name: "異常爆縮", description: "状態異常を消費して即時大ダメ", effect: (g, e) => { const count = g.player.statuses.length; if (count) { g.player.statuses = []; const damage = 10 + count * 12; g.player.hp = Math.max(0, g.player.hp - damage); g.log(`${e.id}の異常爆縮: ${damage}ダメージ`); } } },
+  { id: "adaptive-evolution", name: "適応進化", description: "同じ状態異常を2回受けると無効化", effect: (g, e) => g.log(`${e.id}は適応進化している`) },
+  { id: "mana-drain", name: "魔力吸収", description: "攻撃命中時、MP吸収", effect: (g, e) => { enemyAttack(g, e, 1.0, "physical", "敵スキル:魔力吸収"); g.player.mp = Math.max(0, g.player.mp - 10); g.log("MPが吸収された"); } },
+  { id: "chant-disrupt", name: "詠唱妨害", description: "MP消費量増加", effect: (g) => enemyApplyDebuff(g, "mpCostUp", 3, 0.5, "詠唱妨害: MP消費増加") },
+  { id: "mana-seal", name: "魔力封鎖", description: "一定ターン、MP回復不可", effect: (g) => enemyApplyDebuff(g, "mpRegenBlock", 3, 1, "魔力封鎖: MP回復不可") },
+  { id: "overload", name: "過負荷", description: "MPが多いほど被ダメ増加", effect: (g, e) => g.log(`${e.id}は過負荷を狙う`) },
+  { id: "depletion-hunt", name: "枯渇誘導", description: "MP0の相手に与ダメ増加", effect: (g, e) => g.log(`${e.id}は枯渇誘導を狙う`) },
+  { id: "regen-factor", name: "再生因子", description: "状態異常がない間HP回復", effect: (g, e) => g.log(`${e.id}は再生因子を持つ`) },
+  { id: "element-shell", name: "属性殻", description: "自身の属性ダメ軽減", effect: (g, e) => g.log(`${e.id}は属性殻を纏う`) },
+  { id: "counter-shell", name: "反撃殻", description: "被ダメ時、同属性で反撃", effect: (g, e) => g.log(`${e.id}の反撃殻が光る`) },
+  { id: "tenacity", name: "執念", description: "HP0でも1ターン行動", effect: (g, e) => g.log(`${e.id}の執念が燃える`) },
+  { id: "rampage", name: "暴走", description: "HP低下時、全ステ上昇", effect: (g, e) => g.log(`${e.id}は暴走の兆し`) },
+  { id: "attribute-pollution", name: "属性汚染", description: "プレイヤー攻撃属性を一時変更", effect: (g) => { const elements = ["physical", "fire", "ice", "lightning"]; const element = elements[Math.floor(Math.random() * elements.length)]; g.player.temp.attackElementOverride = { element, duration: 3 }; g.log(`属性汚染で攻撃属性が${CONFIG.elementNames[element]}に変化`); } },
+  { id: "skill-break", name: "スキル破壊", description: "使用されたスキルを封印", effect: (g, e) => { if (g.player.lastSkillId) { const skill = PLAYER_SKILLS.find((s) => s.id === g.player.lastSkillId); g.player.sealedSkills[g.player.lastSkillId] = 3; g.log(`${e.id}は${skill ? skill.name : g.player.lastSkillId}を封印した`); } } },
+  { id: "timed-collapse", name: "時限崩壊", description: "数ターン後に状態異常一斉付与", effect: (g, e) => { g.player.temp.collapseTimer = 3; g.log(`${e.id}は時限崩壊を仕掛けた`); } },
+  { id: "resonance-jam", name: "共鳴阻害", description: "状態異常の相互効果を無効化", effect: (g, e) => { g.player.temp.disableSynergy = 3; g.log(`${e.id}は共鳴阻害を発動`); } },
+  { id: "doom-mimic", name: "終焉模倣", description: "直前スキルをコピー", effect: (g, e) => {
+      if (!g.player.lastSkillId) return;
+      const skill = PLAYER_SKILLS.find((s) => s.id === g.player.lastSkillId);
+      if (!skill) return;
+      const element = skill.id.includes("fire") ? "fire" : skill.id.includes("ice") ? "ice" : skill.id.includes("thunder") ? "lightning" : "physical";
+      enemyAttack(g, e, 1.1, element, `敵スキル:終焉模倣(${skill.name})`);
+      if (element === "fire") g.applyStatus(g.player, "burn", 2, 6, false);
+      if (element === "ice") g.applyStatus(g.player, "freeze", 2, 0.15, false);
+      if (element === "lightning") g.applyStatus(g.player, "shock", 2, 0.12, false);
+      if (skill.id.includes("laceration") || skill.id.includes("bleed")) g.applyStatus(g.player, "bleed", 2, 0.02, false);
+    } },
 ];
 
 class Game {
@@ -134,6 +201,9 @@ class Game {
       skills: [],
       kills: 0,
       statuses: [],
+      debuffs: [],
+      sealedSkills: {},
+      lastSkillId: null,
       temp: {},
       passiveResist: { physical: 0, fire: 0, ice: 0, lightning: 0 },
     };
@@ -148,6 +218,7 @@ class Game {
     this.logEl = document.getElementById("log");
     this.activeSkillButtonsEl = document.getElementById("activeSkillButtons");
     this.statusArea = document.getElementById("statusArea");
+    this.passiveSkillsEl = document.getElementById("passiveSkills");
     this.basicAttackBtn = document.getElementById("basicAttackBtn");
 
     this.wireEvents();
@@ -158,6 +229,35 @@ class Game {
 
   hasSkill(id) {
     return this.player.skills.some((s) => s.id === id);
+  }
+
+  hasEnemySkill(id) {
+    return this.enemies.some((enemy) => enemy.enemySkill.id === id);
+  }
+
+  applyDebuff(type, duration, value) {
+    this.player.debuffs.push({ type, duration, value });
+  }
+
+  getDebuffMultiplier(type, fallback = 1) {
+    const debuffs = this.player.debuffs.filter((d) => d.type === type);
+    if (!debuffs.length) return fallback;
+    return debuffs.reduce((mult, debuff) => mult * debuff.value, fallback);
+  }
+
+  getDebuffValue(type) {
+    return this.player.debuffs.filter((d) => d.type === type).reduce((sum, debuff) => sum + debuff.value, 0);
+  }
+
+  isSkillSealed(skillId) {
+    return Boolean(this.player.sealedSkills[skillId]);
+  }
+
+  healPlayer(amount, source) {
+    const multiplier = this.getDebuffMultiplier("healMultiplier", 1);
+    const heal = Math.max(0, Math.round(amount * multiplier));
+    this.player.hp = Math.min(this.player.maxHp, this.player.hp + heal);
+    this.log(`${source}でHP+${heal}`);
   }
 
   wireEvents() {
@@ -223,25 +323,35 @@ class Game {
 
     if (mode === "basic") {
       const damage = this.calculateDamage(this.player.atk, target.def, target, "player", "physical", target);
-      this.hitTarget(target, damage, "プレイヤー", this.hasSkill("charged-weapon") ? "lightning" : "physical", "通常攻撃");
+      const overrideElement = this.player.temp.attackElementOverride?.element;
+      const baseElement = this.hasSkill("charged-weapon") ? "lightning" : "physical";
+      const element = overrideElement || baseElement;
+      this.hitTarget(target, damage, "プレイヤー", element, "通常攻撃");
       if (this.hasSkill("charged-weapon")) this.applyStatus(target, "shock", 2, 0.1, true);
       if (this.hasSkill("mana-siphon") && target.statuses.length) this.restoreMp(5, "魔力吸収");
     } else {
       const selectedId = chosenSkillId;
       const selected = PLAYER_SKILLS.find((s) => s.id === selectedId && s.kind === "active");
       if (!selected || !this.hasSkill(selected.id)) return this.log("使用可能なアクティブスキルがありません。");
-      const cost = this.computeSkillCost(selected.mpCost);
-      if (cost > 0 && this.player.mp < cost) {
-        if (!this.hasSkill("mana-reflux")) return this.log(`MP不足で ${selected.name} を使えない。`);
-        const hpCost = Math.max(1, Math.ceil((cost - this.player.mp) * 1.5));
-        this.player.mp = 0;
-        this.player.hp = Math.max(0, this.player.hp - hpCost);
-        this.log(`魔力逆流でHPを${hpCost}消費して ${selected.name} を発動。`);
+      if (this.isSkillSealed(selected.id)) {
+        this.log(`${selected.name} は封印されていて使用できない。`);
+      } else if (Math.random() < this.getDebuffValue("skillFail")) {
+        this.log(`${selected.name} の発動に失敗した。`);
       } else {
-        this.player.mp -= cost;
+        const cost = this.computeSkillCost(selected.mpCost);
+        if (cost > 0 && this.player.mp < cost) {
+          if (!this.hasSkill("mana-reflux")) return this.log(`MP不足で ${selected.name} を使えない。`);
+          const hpCost = Math.max(1, Math.ceil((cost - this.player.mp) * 1.5));
+          this.player.mp = 0;
+          this.player.hp = Math.max(0, this.player.hp - hpCost);
+          this.log(`魔力逆流でHPを${hpCost}消費して ${selected.name} を発動。`);
+        } else {
+          this.player.mp -= cost;
+        }
+        mpSpent = cost > 0;
+        this.usePlayerSkill(selected, target);
+        this.player.lastSkillId = selected.id;
       }
-      mpSpent = cost > 0;
-      this.usePlayerSkill(selected, target);
     }
 
     this.cleanupDeadEnemies();
@@ -250,11 +360,16 @@ class Game {
     this.despawnUnattackedEnemies();
 
     const mpRegen = 10 + (this.hasSkill("calm-mind") ? 5 : 0);
-    if (!mpSpent) this.restoreMp(mpRegen, "自然回復");
+    if (!mpSpent) {
+      if (this.getDebuffValue("mpRegenBlock") > 0) {
+        this.log("MP回復が封じられている。");
+      } else {
+        this.restoreMp(mpRegen, "自然回復");
+      }
+    }
     if (!mpSpent && this.hasSkill("self-repair")) {
       const heal = Math.max(2, Math.round(this.player.maxHp * 0.02));
-      this.player.hp = Math.min(this.player.maxHp, this.player.hp + heal);
-      this.log(`自己修復でHP+${heal}`);
+      this.healPlayer(heal, "自己修復");
     }
 
     this.player.temp = { ...this.player.temp, overcast: false, statusAmp: false, ironWall: false, counter: false };
@@ -265,6 +380,9 @@ class Game {
 
   computeSkillCost(baseCost) {
     let cost = baseCost;
+    if (this.getDebuffValue("mpCostUp") > 0) {
+      cost = Math.round(cost * (1 + this.getDebuffValue("mpCostUp")));
+    }
     if (this.hasSkill("overcast") && this.player.temp.overcast) cost *= 2;
     if (this.hasSkill("mana-save") && Math.random() < 0.25) {
       this.log("魔力節約が発動しMP消費0。");
@@ -327,7 +445,7 @@ class Game {
       case "focus": this.restoreMp(20 * overcastMul, "集中"); break;
       case "overcast": this.player.temp.overcast = true; this.log("過剰詠唱: 次スキル威力&コスト2倍"); break;
       case "iron-wall": this.player.temp.ironWall = true; this.log("鉄壁: 次の被ダメ大幅軽減"); break;
-      case "hemostasis": this.removeStatus(this.player, "bleed"); this.player.hp = Math.min(this.player.maxHp, this.player.hp + 30); this.log("血止めで回復"); break;
+      case "hemostasis": this.removeStatus(this.player, "bleed"); this.healPlayer(30, "血止め"); break;
       case "element-invert": {
         const options = enemyElements.filter((el) => el !== target.element);
         target.element = options[Math.floor(Math.random() * options.length)];
@@ -358,29 +476,66 @@ class Game {
     const useSkill = !attacker.temp.skillBlocked && Math.random() < 0.35;
     if (useSkill) return attacker.enemySkill.effect(this, attacker);
 
-    const damage = this.calculateDamage(attacker.atk, this.player.def, this.player, "enemy", attacker.element);
+    let attackMult = 1;
+    if (attacker.enemySkill.id === "execution-instinct" && this.player.hp / this.player.maxHp < 0.4) attackMult *= 1.4;
+    if (attacker.enemySkill.id === "overload" && this.player.mp / this.player.maxMp > 0.6) attackMult *= 1.25;
+    if (attacker.enemySkill.id === "depletion-hunt" && this.player.mp === 0) attackMult *= 1.3;
+    if (attacker.enemySkill.id === "rampage" && attacker.hp / attacker.maxHp < 0.35) attackMult *= 1.2;
+    if (attacker.enemySkill.id === "abnormal-proliferation") attackMult *= 1 + this.player.statuses.length * 0.05;
+    if (attacker.temp.spreadingFury) {
+      const burningCount = this.enemies.filter((e) => this.hasStatus(e, "burn")).length + (this.hasStatus(this.player, "burn") ? 1 : 0);
+      attackMult *= 1 + burningCount * 0.05;
+    }
+    const damage = this.calculateDamage(attacker.atk * attackMult, this.player.def, this.player, "enemy", attacker.element);
     this.hitPlayer(damage, attacker, "通常攻撃");
+
+    if (attacker.temp.extraAction) {
+      attacker.temp.extraAction = 0;
+      const extraDamage = this.calculateDamage(attacker.atk * 0.8, this.player.def, this.player, "enemy", attacker.element);
+      this.hitPlayer(extraDamage, attacker, "過熱追撃");
+    }
+    if (attacker.temp.electroAccel && this.enemies.some((e) => this.hasStatus(e, "shock"))) {
+      const accelDamage = this.calculateDamage(attacker.atk * 0.75, this.player.def, this.player, "enemy", attacker.element);
+      this.hitPlayer(accelDamage, attacker, "電磁加速追撃");
+    }
   }
 
   calculateDamage(rawAtk, targetDef, defender, attackerType, element = "physical", explicitTarget = null) {
     const attackerFreezePenalty = attackerType === "player" ? this.getFreezePenalty(this.player) : 1;
-    const base = Math.max(1, rawAtk * attackerFreezePenalty - targetDef);
+    let adjustedDef = targetDef;
+    if (attackerType === "enemy" && this.getDebuffValue("defDown") > 0) {
+      adjustedDef = Math.max(0, adjustedDef - this.getDebuffValue("defDown"));
+    }
+    if (attackerType === "player") {
+      const target = explicitTarget || defender;
+      if (target.enemySkill.id === "ice-armor" && this.hasStatus(target, "freeze")) {
+        adjustedDef += 4;
+      }
+    }
+    const base = Math.max(1, rawAtk * attackerFreezePenalty - adjustedDef);
 
     let dmg = base * this.getShockMultiplier(defender);
     if (attackerType === "player") {
       const target = explicitTarget || defender;
-      if (this.hasSkill("pursuit-stance") && this.hasStatus(target, "bleed")) dmg *= 1.35;
-      if (this.hasSkill("vital-read") && this.hasStatus(target, "shock") && Math.random() < 0.45) dmg *= 1.8;
-      if (this.hasSkill("overcurrent") && this.hasStatus(target, "shock")) dmg *= 1.2;
-      if (this.hasSkill("thunder-resonance")) {
-        const shockedCount = this.enemies.filter((e) => this.hasStatus(e, "shock")).length;
-        dmg *= 1 + shockedCount * 0.08;
+      if (this.getDebuffMultiplier("damageDealt", 1) !== 1) dmg *= this.getDebuffMultiplier("damageDealt", 1);
+      if (!this.player.temp.disableSynergy) {
+        if (this.hasSkill("pursuit-stance") && this.hasStatus(target, "bleed")) dmg *= 1.35;
+        if (this.hasSkill("vital-read") && this.hasStatus(target, "shock") && Math.random() < 0.45) dmg *= 1.8;
+        if (this.hasSkill("overcurrent") && this.hasStatus(target, "shock")) dmg *= 1.2;
+        if (this.hasSkill("thunder-resonance")) {
+          const shockedCount = this.enemies.filter((e) => this.hasStatus(e, "shock")).length;
+          dmg *= 1 + shockedCount * 0.08;
+        }
       }
+      if (target.enemySkill.id === "element-shell" && element === target.element) dmg *= 0.75;
+      if (target.enemySkill.id === "ash-barrier" && (this.hasStatus(target, "burn") || target.temp.ashBarrier > 0)) dmg *= 0.8;
+      if (target.enemySkill.id === "rampage" && target.hp / target.maxHp < 0.35) dmg *= 0.8;
     } else {
       if (this.player.temp.barrier) dmg *= 1 - this.player.temp.barrier;
       if (this.player.temp.ironWall) dmg *= 0.25;
       if (this.hasSkill("fire-ice-guard") && ["fire", "ice"].includes(element)) dmg *= 0.75;
       if (this.hasSkill("adaptive-evo")) dmg *= 1 - (this.player.passiveResist[element] || 0);
+      if (this.getDebuffMultiplier("damageTaken", 1) !== 1) dmg *= this.getDebuffMultiplier("damageTaken", 1);
     }
 
     return Math.max(1, Math.round(dmg));
@@ -390,6 +545,16 @@ class Game {
     target.hp = Math.max(0, target.hp - damage);
     target.turnsSinceDamaged = 0;
     this.log(`${sourceName}の${actionLabel} (${CONFIG.elementNames[element]}): ${damage}ダメージ -> ${target.id}`);
+    if (target.enemySkill.id === "counter-shell") {
+      const counterDamage = Math.max(1, Math.round(damage * 0.3));
+      this.player.hp = Math.max(0, this.player.hp - counterDamage);
+      this.log(`${target.id}の反撃殻: ${counterDamage}ダメージ反射`);
+    }
+    if (target.enemySkill.id === "thunder-reflect" && element === "lightning") {
+      const reflect = Math.max(1, Math.round(damage * 0.25));
+      this.player.hp = Math.max(0, this.player.hp - reflect);
+      this.log(`${target.id}の雷鳴反射: ${reflect}ダメージ`);
+    }
   }
 
   hitPlayer(damage, attacker, actionLabel) {
@@ -403,8 +568,7 @@ class Game {
     }
     if (this.hasSkill("adaptive-evo")) this.player.passiveResist[attacker.element] = Math.min(0.35, (this.player.passiveResist[attacker.element] || 0) + 0.03);
     if (this.hasSkill("lightning-evasion") && this.hasStatus(this.player, "shock") && Math.random() < 0.25) {
-      this.player.hp = Math.min(this.player.maxHp, this.player.hp + damage);
-      this.log("雷避け発動: ダメージを回避");
+      this.healPlayer(damage, "雷避け");
     }
   }
 
@@ -418,6 +582,23 @@ class Game {
 
   applyStatus(target, type, duration, value, isPlayerSource) {
     if (target === this.player && type === "freeze" && this.hasSkill("cold-resist")) return this.log("寒冷耐性で凍結無効");
+    if (target !== this.player) {
+      if (target.enemySkill.id === "abnormal-resistance") {
+        duration = Math.max(1, Math.ceil(duration * 0.5));
+        value *= 0.5;
+      }
+      if (target.enemySkill.id === "adaptive-evolution") {
+        target.temp.statusCounts ??= {};
+        target.temp.statusCounts[type] = (target.temp.statusCounts[type] || 0) + 1;
+        if (target.temp.statusCounts[type] >= 2) {
+          this.log(`${target.id}は${STATUS_NAMES[type]}に適応した。`);
+          return;
+        }
+      }
+      if (target.enemySkill.id === "abnormal-reversal" && isPlayerSource) {
+        this.applyStatus(this.player, type, duration, value, false);
+      }
+    }
     target.statuses.push({ type, duration, value });
     const owner = target === this.player ? "プレイヤー" : target.id;
     this.log(`${owner}に状態異常 ${STATUS_NAMES[type]} を付与 (${duration}T)`);
@@ -444,9 +625,49 @@ class Game {
           if (this.hasSkill("bleed-spread") && entity !== this.player) status.value += 0.005;
           this.dealStatusDamage(entity, Math.max(1, Math.round((entity.maxHp || this.player.maxHp) * status.value)), "出血");
         }
-        if (status.type === "burn") this.dealStatusDamage(entity, Math.max(1, Math.round(status.value)), "炎上");
+        if (status.type === "burn") {
+          let burnDamage = Math.max(1, Math.round(status.value));
+          if (this.hasEnemySkill("cold-domination")) burnDamage = Math.max(1, Math.round(burnDamage * 0.6));
+          this.dealStatusDamage(entity, burnDamage, "炎上");
+        }
         status.duration -= 1;
+        if (entity === this.player && status.type === "freeze" && status.duration <= 0 && this.hasEnemySkill("frostbite")) {
+          this.dealStatusDamage(entity, 12, "凍傷");
+        }
       });
+
+      if (entity === this.player) {
+        this.player.debuffs.forEach((debuff) => {
+          debuff.duration -= 1;
+        });
+        this.player.debuffs = this.player.debuffs.filter((debuff) => debuff.duration > 0);
+        Object.keys(this.player.sealedSkills).forEach((skillId) => {
+          this.player.sealedSkills[skillId] -= 1;
+          if (this.player.sealedSkills[skillId] <= 0) delete this.player.sealedSkills[skillId];
+        });
+        if (this.player.temp.attackElementOverride) {
+          this.player.temp.attackElementOverride.duration -= 1;
+          if (this.player.temp.attackElementOverride.duration <= 0) this.player.temp.attackElementOverride = null;
+        }
+        if (this.player.temp.disableSynergy) {
+          this.player.temp.disableSynergy -= 1;
+        }
+        if (this.player.temp.collapseTimer) {
+          this.player.temp.collapseTimer -= 1;
+          if (this.player.temp.collapseTimer <= 0) {
+            this.applyStatus(this.player, "bleed", 3, 0.03, false);
+            this.applyStatus(this.player, "burn", 3, 8, false);
+            this.applyStatus(this.player, "shock", 3, 0.15, false);
+            this.applyStatus(this.player, "freeze", 2, 0.2, false);
+            this.player.temp.collapseTimer = null;
+          }
+        }
+      }
+
+      if (entity === this.player && this.hasEnemySkill("corrosive-erosion") && entity.statuses.length) {
+        this.player.def = Math.max(0, Math.round((this.player.def - 0.2) * 10) / 10);
+        this.log("腐食侵食でDEF低下");
+      }
 
       if (entity !== this.player && entity.temp.timeBomb) {
         entity.temp.timeBomb.turn -= 1;
@@ -460,6 +681,14 @@ class Game {
       if (entity.temp) {
         entity.temp.actionPenalty = 0;
         entity.temp.skillBlocked = false;
+        if (entity.temp.spreadingFury) entity.temp.spreadingFury -= 1;
+        if (entity.temp.ashBarrier) entity.temp.ashBarrier -= 1;
+        if (entity.temp.electroAccel) entity.temp.electroAccel -= 1;
+      }
+      if (entity !== this.player && entity.enemySkill.id === "regen-factor" && entity.statuses.length === 0) {
+        const heal = Math.max(2, Math.round(entity.maxHp * 0.04));
+        entity.hp = Math.min(entity.maxHp, entity.hp + heal);
+        this.log(`${entity.id}の再生因子でHP+${heal}`);
       }
     });
 
@@ -483,15 +712,27 @@ class Game {
   }
 
   cleanupDeadEnemies() {
+    this.enemies.forEach((enemy) => {
+      if (enemy.hp <= 0 && enemy.enemySkill.id === "tenacity" && !enemy.temp.tenacityUsed) {
+        enemy.hp = 1;
+        enemy.temp.tenacityUsed = true;
+        this.log(`${enemy.id}の執念で踏みとどまった！`);
+      }
+    });
     const dead = this.enemies.filter((e) => e.hp <= 0);
     dead.forEach((enemy) => {
+      if (enemy.enemySkill.id === "self-destruct-core") {
+        const damage = Math.max(8, Math.round(enemy.level * 3));
+        this.player.hp = Math.max(0, this.player.hp - damage);
+        this.applyStatus(this.player, "burn", 3, 8, false);
+        this.log(`${enemy.id}の自爆炉心でプレイヤーに${damage}ダメージ`);
+      }
       this.player.kills += 1;
       this.applyReward(enemy);
       this.grantSkill(enemy);
       if (this.hasSkill("blood-feast")) {
         const heal = this.hasStatus(enemy, "bleed") ? 24 : 12;
-        this.player.hp = Math.min(this.player.maxHp, this.player.hp + heal);
-        this.log(`血祭りでHP+${heal}`);
+        this.healPlayer(heal, "血祭り");
       }
       if (this.hasSkill("infection-burst") && enemy.statuses.length) {
         this.enemies.filter((e) => e.id !== enemy.id).forEach((e) => {
@@ -533,7 +774,8 @@ class Game {
     if (gained.kind === "active") {
       const activeSkills = this.player.skills.filter((s) => s.kind === "active");
       if (activeSkills.length >= 6) {
-        const replace = window.confirm(`${gained.name} を獲得しました。アクティブスキルは6つまでです。入れ替えますか？`);
+        const gainedDesc = SKILL_DESCRIPTIONS[gained.id] || "説明なし";
+        const replace = window.confirm(`${gained.name} を獲得しました。${gainedDesc}\nアクティブスキルは6つまでです。入れ替えますか？`);
         if (!replace) {
           this.log(`${gained.name} を見送りました。`);
           return;
@@ -580,12 +822,20 @@ class Game {
     const st = this.player.statuses.map((s) => `${STATUS_NAMES[s.type]}(${s.duration})`).join(" / ");
     this.statusArea.innerHTML = `<p>状態異常: ${st || "なし"}</p>`;
 
+    if (this.passiveSkillsEl) {
+      const passives = this.player.skills.filter((s) => s.kind === "passive");
+      const listItems = passives.length
+        ? passives.map((skill) => `<li><strong>${skill.name}</strong> - ${SKILL_DESCRIPTIONS[skill.id] || "説明なし"}</li>`).join("")
+        : "<li>未取得</li>";
+      this.passiveSkillsEl.innerHTML = `<h3>パッシブスキル</h3><ul>${listItems}</ul>`;
+    }
+
     this.enemyListEl.innerHTML = "";
     this.enemies.forEach((enemy) => {
       const card = document.createElement("article");
       card.className = `enemy-card ${enemy.element} ${enemy.id === this.selectedEnemyId ? "selected" : ""}`;
       const statuses = enemy.statuses.map((s) => `${STATUS_NAMES[s.type]}(${s.duration})`).join(" / ") || "なし";
-      card.innerHTML = `<p><strong>${enemy.id}</strong> Lv${enemy.level} (${CONFIG.elementNames[enemy.element]})</p><p>HP: ${enemy.hp} / ${enemy.maxHp}</p><p>ATK: ${enemy.atk} | DEF: ${enemy.def}</p><p>報酬: ${enemy.rewardStat.toUpperCase()}</p><p>固有スキル: ${enemy.enemySkill.name}</p><p>状態異常: ${statuses}</p><p>消滅まで: ${CONFIG.despawnTurns - enemy.turnsSinceDamaged}T</p>`;
+      card.innerHTML = `<p><strong>${enemy.id}</strong> Lv${enemy.level} (${CONFIG.elementNames[enemy.element]})</p><p>HP: ${enemy.hp} / ${enemy.maxHp}</p><p>ATK: ${enemy.atk} | DEF: ${enemy.def}</p><p>報酬: ${enemy.rewardStat.toUpperCase()}</p><p>固有スキル: ${enemy.enemySkill.name}</p><p class="enemy-skill-desc">${enemy.enemySkill.description}</p><p>状態異常: ${statuses}</p><p>消滅まで: ${CONFIG.despawnTurns - enemy.turnsSinceDamaged}T</p>`;
       card.addEventListener("click", () => {
         this.selectedEnemyId = enemy.id;
         this.render();
