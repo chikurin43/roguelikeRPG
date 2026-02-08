@@ -146,11 +146,9 @@ class Game {
     this.playerStatsEl = document.getElementById("playerStats");
     this.enemyListEl = document.getElementById("enemyList");
     this.logEl = document.getElementById("log");
-    this.skillSelect = document.getElementById("skillSelect");
-    this.skillDescriptionEl = document.getElementById("skillDescription");
+    this.activeSkillButtonsEl = document.getElementById("activeSkillButtons");
     this.statusArea = document.getElementById("statusArea");
     this.basicAttackBtn = document.getElementById("basicAttackBtn");
-    this.useSkillBtn = document.getElementById("useSkillBtn");
 
     this.wireEvents();
     this.bootstrapEnemies();
@@ -164,8 +162,6 @@ class Game {
 
   wireEvents() {
     this.basicAttackBtn.addEventListener("click", () => this.playerAction("basic"));
-    this.useSkillBtn.addEventListener("click", () => this.playerAction("skill"));
-    this.skillSelect.addEventListener("change", () => this.updateSkillDescription());
   }
 
   bootstrapEnemies() {
@@ -214,7 +210,7 @@ class Game {
     return this.enemies.find((e) => e.id === this.selectedEnemyId);
   }
 
-  playerAction(mode) {
+  playerAction(mode, chosenSkillId = null) {
     if (this.player.hp <= 0) return;
     const target = this.getSelectedEnemy();
     if (!target) return this.log("攻撃対象がいません。");
@@ -231,7 +227,8 @@ class Game {
       if (this.hasSkill("charged-weapon")) this.applyStatus(target, "shock", 2, 0.1, true);
       if (this.hasSkill("mana-siphon") && target.statuses.length) this.restoreMp(5, "魔力吸収");
     } else {
-      const selected = PLAYER_SKILLS.find((s) => s.id === this.skillSelect.value && s.kind === "active");
+      const selectedId = chosenSkillId;
+      const selected = PLAYER_SKILLS.find((s) => s.id === selectedId && s.kind === "active");
       if (!selected || !this.hasSkill(selected.id)) return this.log("使用可能なアクティブスキルがありません。");
       const cost = this.computeSkillCost(selected.mpCost);
       if (cost > 0 && this.player.mp < cost) {
@@ -533,6 +530,28 @@ class Game {
     const notOwned = PLAYER_SKILLS.filter((s) => !this.hasSkill(s.id));
     if (!notOwned.length) return this.log(`${enemy.id}から新スキル獲得なし。`);
     const gained = notOwned[Math.floor(Math.random() * notOwned.length)];
+    if (gained.kind === "active") {
+      const activeSkills = this.player.skills.filter((s) => s.kind === "active");
+      if (activeSkills.length >= 6) {
+        const replace = window.confirm(`${gained.name} を獲得しました。アクティブスキルは6つまでです。入れ替えますか？`);
+        if (!replace) {
+          this.log(`${gained.name} を見送りました。`);
+          return;
+        }
+        const options = activeSkills.map((s, idx) => `${idx + 1}:${s.name}`).join(" / ");
+        const input = window.prompt(`入れ替えるスキル番号を選んでください (${options})`);
+        const index = Number.parseInt(input ?? "", 10) - 1;
+        if (Number.isNaN(index) || index < 0 || index >= activeSkills.length) {
+          this.log("入れ替えに失敗したため獲得を見送りました。");
+          return;
+        }
+        const toReplace = activeSkills[index];
+        this.player.skills = this.player.skills.filter((s) => s.id !== toReplace.id);
+        this.player.skills.push(gained);
+        this.log(`${enemy.id}からスキル獲得: ${gained.name} (MP:${gained.mpCost}) / ${toReplace.name} を入れ替え`);
+        return;
+      }
+    }
     this.player.skills.push(gained);
     this.log(`${enemy.id}からスキル獲得: ${gained.name}${gained.kind === "active" ? ` (MP:${gained.mpCost})` : " [パッシブ]"}`);
   }
@@ -554,30 +573,10 @@ class Game {
     if (this.player.hp > 0) return;
     this.log(`ゲームオーバー。撃破数: ${this.player.kills}`);
     this.basicAttackBtn.disabled = true;
-    this.useSkillBtn.disabled = true;
-  }
-
-  updateSkillDescription() {
-    if (!this.skillDescriptionEl) return;
-    const id = this.skillSelect.value;
-    if (!id) {
-      this.skillDescriptionEl.textContent = "スキル未選択";
-      return;
-    }
-
-    const skill = PLAYER_SKILLS.find((s) => s.id === id);
-    if (!skill) {
-      this.skillDescriptionEl.textContent = "説明なし";
-      return;
-    }
-
-    const typeText = skill.kind === "active" ? "アクティブ" : "パッシブ";
-    const costText = skill.kind === "active" ? ` / MP:${skill.mpCost}` : "";
-    this.skillDescriptionEl.textContent = `${skill.name} [${typeText}${costText}] - ${SKILL_DESCRIPTIONS[id] || "説明なし"}`;
   }
 
   render() {
-    this.playerStatsEl.innerHTML = `<p>ターン: ${this.turn}</p><p>撃破数: ${this.player.kills}</p><p>HP: ${this.player.hp} / ${this.player.maxHp}</p><p>MP: ${this.player.mp} / ${this.player.maxMp}</p><p>ATK: ${this.player.atk}</p><p>DEF: ${this.player.def}</p><p>取得スキル: ${this.player.skills.length}/50</p>`;
+    this.playerStatsEl.innerHTML = `<div class="stats-grid"><p>ターン: ${this.turn}</p><p>撃破数: ${this.player.kills}</p><p>HP: ${this.player.hp} / ${this.player.maxHp}</p><p>MP: ${this.player.mp} / ${this.player.maxMp}</p><p>ATK: ${this.player.atk}</p><p>DEF: ${this.player.def}</p><p>取得スキル: ${this.player.skills.length}/50</p></div>`;
     const st = this.player.statuses.map((s) => `${STATUS_NAMES[s.type]}(${s.duration})`).join(" / ");
     this.statusArea.innerHTML = `<p>状態異常: ${st || "なし"}</p>`;
 
@@ -594,19 +593,8 @@ class Game {
       this.enemyListEl.appendChild(card);
     });
 
-    this.skillSelect.innerHTML = "";
     const activeSkills = this.player.skills.filter((s) => s.kind === "active");
-    const placeholder = document.createElement("option");
-    placeholder.value = "";
-    placeholder.textContent = activeSkills.length ? "スキルを選択" : "アクティブスキル未所持";
-    this.skillSelect.appendChild(placeholder);
-    activeSkills.forEach((skill) => {
-      const opt = document.createElement("option");
-      opt.value = skill.id;
-      opt.textContent = `${skill.name} (MP:${skill.mpCost})`;
-      this.skillSelect.appendChild(opt);
-    });
-    this.updateSkillDescription();
+    this.renderSkillButtons(activeSkills);
   }
 
   log(message) {
@@ -614,6 +602,27 @@ class Game {
     p.textContent = message;
     this.logEl.prepend(p);
     while (this.logEl.childElementCount > 220) this.logEl.lastElementChild.remove();
+  }
+
+  renderSkillButtons(activeSkills) {
+    if (!this.activeSkillButtonsEl) return;
+    this.activeSkillButtonsEl.innerHTML = "";
+    const buttons = activeSkills.slice(0, 6);
+    buttons.forEach((skill) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "skill-button";
+      const desc = SKILL_DESCRIPTIONS[skill.id] || "説明なし";
+      button.innerHTML = `<strong>${skill.name}</strong><span>MP:${skill.mpCost} / ${desc}</span>`;
+      button.addEventListener("click", () => this.playerAction("skill", skill.id));
+      this.activeSkillButtonsEl.appendChild(button);
+    });
+    for (let i = buttons.length; i < 6; i += 1) {
+      const empty = document.createElement("div");
+      empty.className = "skill-button";
+      empty.innerHTML = "<strong>空きスロット</strong><span>撃破でスキルを獲得</span>";
+      this.activeSkillButtonsEl.appendChild(empty);
+    }
   }
 }
 

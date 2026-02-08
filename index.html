@@ -16,12 +16,10 @@
           <h2>プレイヤー行動</h2>
           <p>敵を選んで「通常攻撃」またはスキルを使用してください。</p>
           <div class="skill-row">
-            <label for="skillSelect">アクティブスキル</label>
-            <select id="skillSelect"></select>
-            <button id="useSkillBtn" type="button">スキル使用</button>
+            <button id="basicAttackBtn" type="button">通常攻撃</button>
+            <p class="skill-hint">アクティブスキルは下のボタンから使用</p>
           </div>
-          <p id="skillDescription" class="skill-description">スキル未選択</p>
-          <button id="basicAttackBtn" type="button">通常攻撃</button>
+          <div id="activeSkillButtons" class="skill-buttons"></div>
         </div>
       </section>
 
