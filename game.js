@@ -181,7 +181,7 @@ class Game {
       level,
       maxHp: Math.round(5 * scale * a),
       hp: Math.round(5 * scale * a),
-      atk: Math.max(0.5 Math.round(0.5 * scale * b)),
+      atk: Math.max(0.5, Math.round(0.5 * scale * b)),
       def: Math.round(0.25 * scale * c * 10) / 10,
       rewardStat: rewardStats[Math.floor(Math.random() * rewardStats.length)],
       element,
