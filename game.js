@@ -177,15 +177,16 @@ class Game {
     if (this.enemies.length >= CONFIG.maxEnemies) return;
     const level = this.enemyLevel;
     const [a, b, c] = this.randomWeightTriplet();
+    const scale = 1 + (level * (level - 1)) / 6;
     const element = enemyElements[Math.floor(Math.random() * enemyElements.length)];
 
     const enemy = {
       id: `E${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       level,
-      maxHp: Math.round(10 * level * a),
-      hp: Math.round(10 * level * a),
-      atk: Math.max(1, Math.round(level * b)),
-      def: Math.round(0.5 * level * c * 10) / 10,
+      maxHp: Math.round(10 * scale * a),
+      hp: Math.round(10 * scale * a),
+      atk: Math.max(1, Math.round(scale * b)),
+      def: Math.round(0.5 * scale * c * 10) / 10,
       rewardStat: rewardStats[Math.floor(Math.random() * rewardStats.length)],
       element,
       enemySkill: ENEMY_SKILLS[Math.floor(Math.random() * ENEMY_SKILLS.length)],
@@ -509,20 +510,20 @@ class Game {
   }
 
   applyReward(enemy) {
-    const scale = 1 + (enemy.level * (enemy.level - 1)) / 6;
+    const level = enemy.level;
     if (enemy.rewardStat === "hp") {
-      const gain = Math.round(10 * scale);
+      const gain = 10 * level;
       this.player.maxHp += gain;
       this.player.hp += gain;
       this.log(`報酬: 最大HP +${gain}`);
     }
     if (enemy.rewardStat === "atk") {
-      const gain = Math.round(scale);
+      const gain = level;
       this.player.atk += gain;
       this.log(`報酬: ATK +${gain}`);
     }
     if (enemy.rewardStat === "def") {
-      const gain = Math.round(0.5 * scale * 10) / 10;
+      const gain = Math.round(0.5 * level * 10) / 10;
       this.player.def = Math.round((this.player.def + gain) * 10) / 10;
       this.log(`報酬: DEF +${gain}`);
     }
